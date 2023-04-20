@@ -293,6 +293,14 @@ int main() {
   
   - 基类中的所有 private 成员在派生类中不能使用。
 
+#### 虚函数表指针、虚函数表、虚基类表指针、虚基类表
+
+- 虚函数指针位于对象所在内存，在构造函数执行中进行初始化。
+
+- 虚函数表位于只读常量区，在编译时初始化。
+
+- 虚基类表指针、虚基类表与虚函数表指针和虚函数表类似。
+
 #### 构造函数和析构函数
 
 - 构造函数不能是虚函数，构造函数内部不能调用虚函数：从存储空间角度来看 虚函数的调用需要虚函数表(vptr)指针，而该指针存放在对象的内存空间中，在构造函数中进行初始化工作，即初始化vptr，让它指向正确的虚函数表。所以需要调用构造函数才可以创建或初始化它的值，否则即使开辟了空间，该指针也为随机值；若构造函数声明为虚函数，那么由于对象还未创建，还没有内存空间，更没有虚函数表地址用来调用虚函数——构造函数了。同理，构造函数中不能调用虚函数。
@@ -341,3 +349,174 @@ void fn(int x) {
 - 堆区
 
 - 栈区
+
+#### 字符串操作相关
+
+- C语言中的常用字符串操作
+
+```c
+// 复制字符串
+void strcpy(char* dst, const char* src);
+
+// 复制字符串，长度超过n会被截断
+void strncpy(char* dst, const char* src, size_t n);
+
+// 在尾部追加字符串
+void strcat(char* dst, const char* src);
+
+// 在尾部追加字符串，追加超过n会被截断
+void strncat(char* dst, const char* src);
+
+// 计算字符串长度
+size_t strlen(const char* str);
+
+// 按字典序比较字符串
+int strcmp(const char *s1, const char *s2);
+
+// 按字典序比较字符串，比较长度不超过n
+int strcmp(const char *s1, const char *s2, size_t n);
+
+// 按字典序比较字符串，不区分大小写
+int strcasecmp(const char *s1, const char *s2);
+
+// 按字典序比较字符串，不区分大小写，比较长度不超过n
+int strncasecmp(const char *s1, const char *s2);
+
+// 寻找指定字符在字符串中的位置，如果没找到，返回NULL
+char *strchr(char *str, int c);
+const char *strchr(const char *str, int c);
+
+// 反向寻找指定字符在字符串中的位置，如果没找到，返回NULL
+char *strrchr(char *str, int c);
+const char *strrchr(const char *str, int c);
+
+// 子串匹配
+char *strstr(char *haystack, const char *needle);
+const char *strstr(const char *haystack, const char *needle);
+
+// 按照给定的分隔符集分割字符串
+// 函数会修改字符串，每次调用都会将一个字符串中的分隔符替换为'\0'
+char *strtok(char *s, const char *delim);
+
+// strtok使用示例:
+// 输出：
+// How
+// are
+// you
+// find
+int main() {
+  char str[] = "How are you\nfind";
+  char *s;
+  s = strtok(str, "\r\n\t ");
+  while (s != nullptr) {
+    printf("%s\n", s);
+    s = strtok(NULL, "\r\n\t ");
+  } 
+  return 0;
+}
+```
+
+- std::string查找相关api
+
+  - find(target, off)：寻找 char、char*、string、string_view 在字符串中第一次出现的位置，off 为开始寻找的下标，off 默认为0
+
+  - rfind(traget, off)：与find类似，但反向查找
+
+  - find_first_of(target, off)：同 find
+
+  - find_first_not_of(target, off)：与find类似，但寻找从左到右第一个不满足 target 的下标
+
+  - find_last_of(target, off)：同 rfind
+
+  - find_last_not_of(target, off)：与rfind类似，但寻找从右到左第一个不满足 target 的下标
+
+- C语言中字符串与数据类型的互转
+
+  - 字符串转数值：atoi转int、atof转double、atol转long、atoll转long long
+
+  - 字符串转数值：strtol、strtoll、strtoul、strtoull、strtof、strtod，这些函数类似于c++转换api，整型转换可以指定进制
+
+  - 数值转字符串：通用方法为使用sprintf
+
+- C++中string与数据类型的互转
+
+  - 注意，以下函数很多都具有std::wstring宽字符串的重载
+
+  - string转int：int std::stoi(const string &__str, size_t *idx = nullptr, int base = 10);
+
+  ```cpp
+  /**
+   * @brief string转int
+   * @param str string
+   * @param idx 用于存储转换过程中第一个非数字字符的位置，默认为nullptr
+   * @param base 转换的进制，默认为10进制
+   * @return int 转换结果
+   */
+  int std::stoi(const string &str, size_t *idx = nullptr, int base = 10);
+
+  // 使用示例
+  int main() {
+    string str = "64sb";
+    size_t idx;
+    const auto x = std::stoi(str, &idx, 16);
+    cout << x << endl;   // 100
+    cout << idx << endl; // 2
+    return 0;
+  }
+  ```
+  - string转其他类型
+
+  ```cpp
+  // string转浮点数
+  double stod(const string &str, size_t *idx = nullptr);
+  float stof(const string &str, std::size_t *idx = nullptr);
+  long double stold(const string &str, size_t *idx = nullptr);
+
+  // string转整型
+  long std::stol(const string &str, size_t *idx = nullptr, int base = 10);
+  long long std::stoll(const string &str, size_t *idx = nullptr, int base = 10);
+  long std::stoul(const string &str, size_t *idx = nullptr, int base = 10);
+  long long std::stoull(const string &str, size_t *idx = nullptr, int base = 10);
+  ```
+
+  - 数值类型转string：std::to_string，该函数具有常见的所有数值类型的重载
+
+  - 数值类型与string互转的另外一种方式：使用std::stringstream
+
+  ```cpp
+  template <class out_type, class in_type>
+  out_type convert(const in_type& t) {
+    std::stringstream stream;
+    stream << t;
+    out_type result;
+    stream >> result;
+    return result;
+  }
+
+  int main() {
+    double d;
+    string salary;
+    string s = "12.56";
+    d = convert<double>(s);            // d等于12.56
+    salary = convert<string>(9000.0);  // salary等于”9000”
+  }
+  ```
+
+- 编码方式的转换
+
+```cpp
+#include <locale>
+#include <codecvt>
+
+// wstring转string
+std::string wstring_to_utf8(const std::wstring& wstr) {
+  std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
+  return conv.to_bytes(wstr);
+}
+
+// string转wstring
+std::wstring utf8_to_wstring(const std::string& str) {
+  std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
+  return conv.from_bytes(str);
+}
+```
