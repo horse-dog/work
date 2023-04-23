@@ -226,6 +226,6 @@ class A {
 };
 
 // virtual关键字很重要
-class CouldNotDerive : virtual public A<CouldNotDerive> {};
+class CouldNotDerive1 : virtual public A<CouldNotDerive1> {};
 
-class C : CouldNotDerive {};
+class CouldNotDerive2 final {};
