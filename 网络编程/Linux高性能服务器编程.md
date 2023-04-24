@@ -219,7 +219,7 @@
 #### Nagle算法
 
 - Nagle算法要求一个TCP连接的通信双方在任意时刻都最多只能发送一个未被确认的TCP报文段，在该TCP报文段的确认到达之前不能发送其他TCP报文段。
-- 另一方面，发送方在等待确认的同时手机本端需要发送的微量数据，并在确认到来时以一个TCP报文段将它们全部发出，这样就极大地减少了网络上的微小TCP报文段的数量。
+- 另一方面，发送方在等待确认的同时收集本端需要发送的微量数据，并在确认到来时以一个TCP报文段将它们全部发出，这样就极大地减少了网络上的微小TCP报文段的数量。
 - 该算法的另一个优点在于其自适应性：确认到达得越快，数据也就发送得越快。
 
 #### 接收窗口、拥塞窗口
@@ -666,7 +666,7 @@ int setsockopt(int sockfd, int level, int option_name, const void* option_value,
   ```
 
   - l_onoff 等于0。此时 SO_LINGER 选项不起作用，close 系统调用采用默认行为关闭socket。
-  - l_onoff 不为0，l_linger 等于0。此时 close 吸引调用立即返回，TCP模块将丢弃被关闭的socket对应的TCP发送缓冲区中残留的数据，同时给对方发送一个复位报文段。因此，这种情况给服务器提供了异常终止一个连接的方法。
+  - l_onoff 不为0，l_linger 等于0。此时 close 系统调用立即返回，TCP模块将丢弃被关闭的socket对应的TCP发送缓冲区中残留的数据，同时给对方发送一个复位报文段。因此，这种情况给服务器提供了异常终止一个连接的方法。
   - l_onoff 不为0，l_linger 大于0。此时close的行为取决于两个条件：一是被关闭的socket对应的TCP发送缓冲区中是否还残留有数据；二是该socket时阻塞的还是非阻塞的。对于阻塞的socket，close将等待一段长为 l_linger 的时间，直到TCP模块发送完所有残留数据并得到对方的确认。如果超时，则 close 调用返回-1，设置errno 为 EWOULDBLOCK。如果 socket 是非阻塞的，close将立即返回，此时我们需要根据其返回值和errno来判断残留数据是否已经发送完毕。
 
 ### 网络信息API
@@ -931,6 +931,16 @@ int fcntl(int fd, int cmd, ...);
 
 ### 日志
 
+- Linux提供一个守护进程来处理系统日志：syslogd，不过现在的Linux系统上使用的都是它的升级版——rsyslogd
+
+- rsyslogd守护进程既能接收用户进程输出的日志，又能接收内核日志。
+
+  - 用户进程通过调用syslog函数生成系统日志，该函数将日志输出到一个UNIX本地域socket类型的文件/dev/log中。rsyslogd则监听该文件以获取用户进程的输出。
+
+  - 内核日志由printk等函数打印到内核的环状缓存（ring buffer）中，环状缓存的内容直接映射到/proc/kmsg文件中。rsyslogd则通过读取该文件获得内核日志。
+
+- rsyslogd守护进程在接收到用户进程或内核输入的日志后，会把它们输出至某些特定的日志文件。日志信息具体如何分发，可以通过rsyslogd的配置文件设置。
+
 <img src="img/13.png" style="zoom:80%" />
 
 ```cpp
@@ -1017,7 +1027,7 @@ pid_t getsid(pid_t pid);
 - ps命令
 
 ```shell
-ps -o pid, ppid, pgid, sid, comm | less
+ps -o pid,ppid,pgid,sid,comm | less
 ```
 
 ### 系统资源限制
@@ -1107,7 +1117,7 @@ int daemon(int nochdir, int noclose);
 
 - 睡眠在请求队列上的某个工作线程被唤醒，它往socket上写入服务器处理客户请求的结果。
 
-- 注意，监听端口的可读事件即到达了新的客户端连接请求，Reactor模式中accept这个客户连接应该时交给工作线程来完成的。
+- 注意，监听端口的可读事件即到达了新的客户端连接请求，Reactor模式中accept这个客户连接应该是交给工作线程来完成的。
 
 #### Proactor模式
 
@@ -1121,7 +1131,7 @@ int daemon(int nochdir, int noclose);
 
 - 主线程继续处理其他逻辑。
 
-- 当用户缓冲区的数据被写入socket之后，内核将向应用程序发送一个信号，以通知应用程序数据以及发送完毕。
+- 当用户缓冲区的数据被写入socket之后，内核将向应用程序发送一个信号，以通知应用程序数据已经发送完毕。
 
 - 应用程序预先定义好的信号处理函数选择一个工作线程来作善后处理，比如决定是否关闭socket。
 
@@ -1727,24 +1737,108 @@ int shmget(key_t key, size_t size, int shmflg);
 
 struct shmid_ds {
   struct ipc_perm shm_perm; /*> 共享内存的操作权限 */
-  size_t shm_segsz;   /*> 共享内存大小，单位是字节 */
-  __time_t shm_atime; /*> 对这段内存最后一次调用shmat的时间 */
-  __time_t shm_dtime; /*> 对这段内存最后一次调用shmdt的时间 */
-  __time_t shm_ctime; /*> 对这段内存最后一次调用shmctl的时间 */
-  __pid_t shm_cpid;   /*> 创建者的PID */
-  __pid_t shm_lpid;   /*> 最后一次执行shmat或shmdt操作的进程的PID */
-  shmatt_t shm_attach;/*> 目前关联到此共享内存的进程数量 */
+  size_t shm_segsz;    /*> 共享内存大小，单位是字节 */
+  __time_t shm_atime;  /*> 对这段内存最后一次调用shmat的时间 */
+  __time_t shm_dtime;  /*> 对这段内存最后一次调用shmdt的时间 */
+  __time_t shm_ctime;  /*> 对这段内存最后一次调用shmctl的时间 */
+  __pid_t shm_cpid;    /*> 创建者的PID */
+  __pid_t shm_lpid;    /*> 最后一次执行shmat或shmdt操作的进程的PID */
+  shmatt_t shm_nattach;/*> 目前关联到此共享内存的进程数量 */
   /* 省略一些填充字段 */
 };
 
+/**
+ * @brief 将共享内存描述符关联到进程的地址空间中 
+ * @param shm_id 共享内存描述符
+ * @param shm_addr 指定地址，如果为NULL，则被关联的地址由操作系统选择，这是推荐做法
+ * @param shmflg 选项
+ *  SHM_RND 如果shm_addr非空，且未设置该标志，则共享内存被关联到指定的地址处，如果shm_addr非空且设置了该标志，
+ *          则系统会基于shm_addr指定地址，但会进行页面的对齐
+ *  SHM_RDONLY 进程仅能读共享内存
+ *  SHM_REMAP 如果地址shm_addr已经被关联到一段共享内存，则重新关联
+ *  SHM_EXEC 指定堆共享内存段的执行权限，对共享内存而言，执行权限实际上和读权限是一样的
+ * @return 成功时返回共享内存被关联到的地址，失败则返回(void*)-1并设置errno
+ * @note shmat成功时，将修改内核数据结构shmid_ds的部分字段
+ */
 void* shmat(int shm_id, const void* shm_addr, int shmflg);
 
+/**
+ * @brief 将关联到shm_addr的共享内存从进程中分离
+ * @param 共享内存地址
+ * @return 成功时返回0，失败则返回-1并设置errno
+ * @note shmdt成功时，将修改内核数据结构shmid_ds的部分字段
+ */
 int shmdt(const void* shm_addr);
 
+/**
+ * @brief 控制共享内存的某些属性
+ * @param shm_id 共享内存描述符
+ * @param command 指定要执行的命令
+ * @param buf 携带command关联的命令的信息 
+ */
 int shmctl(int shm_id, int command, struct shmid_ds* buf);
 ```
 
+### 共享内存的POSIX方法
+
+- 利用mmap的MAP_ANONYMOUS标志可以实现父子进程之间的匿名内存共享
+
+- 通过打开同一个文件，mmap也可以实现无关进程之间的内存共享
+
+- linux提供了另外一种利用mmap在无关进程之间共享内存的方式，这种方式无需任何文件的支持，但它需要先使用如下函数来创建或打开一个POSIX共享内存对象，该函数的使用方法与open系统调用完全相同。如果使用shm_open、shm_unlink，则编译时需要指定链接选项-lrt
+
+  ```cpp
+  #include <sys/mman.h>
+  #include <sys/stat.h>
+  #include <fcntl.h>
+  int shm_open(const char* name, int oflag, mode_t mode);
+
+  int shm_unlink(const char* name);
+  ```
+
 ### 消息队列
+
+```cpp
+#include <sys/msg.h>
+
+// 创建或获取一个已有的消息队列
+// msgflg与semget的sem_flags参数的使用和含义完全相同
+int msgget(key_t key, int msgflg);
+
+struct msqid_ds {
+  struct ipc_perm msg_perm;   /* 消息队列的操作权限 */
+  time_t msg_stime;           /* 最后一次调用msgsnd的时间 */
+  time_t msg_rtime;           /* 最后一次调用msgrcv的时间 */
+  time_t msg_ctime;           /* 最后一次被修改的时间 */
+  unsigned long __msg_cbytes; /* 消息队列中已有的字节数 */
+  msgqnum_t msg_qnum;         /* 消息队列中已有的消息数 */
+  msglen_t msg_qbytes;        /* 消息队列中允许的最大字节数 */
+  pid_t msg_lspid;            /* 最后执行msgsnd的进程的PID */
+  pid_t msg_lrpid;            /* 最后执行msgrcv的进程的PID */
+};
+
+// msg_ptr 需要指向一个msgbuf类型，msgflg控制函数的行为,通常只支持IPC_NOWAIT标志实现非阻塞
+int msgsnd(int msqid, const void* msg_ptr, size_t msg_sz, int msgflg);
+
+struct msgbuf {
+  long mtype;       /* 消息类型 */
+  char mtext[512];  /* 消息数据 */
+};
+
+// msgtype == 0: 读取消息队列中的第一个消息
+// msgtype  > 0: 读取消息队列中第一个类型未msgtype的消息（除非指定了标志MSG_EXPECT）
+// msgtype  < 0: 读取消息队列中第一个类型值比msgtype的绝对值小的消息
+// msgflg: IPC_NOWAIT 实现非阻塞
+// msgflg: MSG_EXPECT 如果msgtype大于0，则接收消息队列中第一个非msgtype类型的消息
+// msgflg: MSG_NOERROR 如果消息数据部分的长度超过了msg_sz，就将它截断
+// 成功时返回0，失败时返回-1并设置errno
+int msgrcv(int msqid, void* msg_ptr, size_t msg_sz, long int msgtype, int msgflg);
+
+/**
+ * @brief 控制消息队列中的某些属性 
+ */
+int msgctl(int msqid, int command, struct msqid_ds* buf);
+```
 
 ### IPC命令
 
