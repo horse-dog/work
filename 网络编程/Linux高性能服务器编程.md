@@ -1848,6 +1848,8 @@ int msgctl(int msqid, int command, struct msqid_ds* buf);
 
 ### 在进程间传递文件描述符
 
+- 子进程可以通过UNIX域socke在进程间传递特殊的辅助数据，以实现文件描述符的传递
+
 ## 第 14 章 多线程编程
 
 ### Linux线程概述
