@@ -24,55 +24,69 @@
 
 using std::vector;
 
+// 用于保存一个进程的信息的类
 class process {
  public:
   process() : m_pid(-1) {}
 
  public:
   int m_busy_ratio;
-  pid_t m_pid;
-  int m_pipefd[2];
+  pid_t m_pid;  /*> 进程的PID */
+  int m_pipefd[2];  /*> 用于和主进程通信的管道 */
 };
 
 template <typename C, typename H, typename M>
 class processpool {
  private:
+  // 构造函数
   processpool(int listenfd, int process_number = 8);
 
  public:
+  // 获取processpool单例
   static processpool<C, H, M>* create(int listenfd, int process_number = 8) {
     if (!m_instance) {
       m_instance = new processpool<C, H, M>(listenfd, process_number);
     }
     return m_instance;
   }
+
+  // 析构函数
   ~processpool() { delete[] m_sub_process; }
+  
+  // 进程池中的子进程组和主进程、统统工作起来
   void run(const vector<H>& arg);
 
  private:
   void notify_parent_busy_ratio(int pipefd, M* manager);
   int get_most_free_srv();
   void setup_sig_pipe();
+
+  // 主进程的运行逻辑
   void run_parent();
+
+  // 子进程的运行逻辑
   void run_child(const vector<H>& arg);
 
  private:
-  static const int MAX_PROCESS_NUMBER = 16;
-  static const int USER_PER_PROCESS = 65536;
-  static const int MAX_EVENT_NUMBER = 10000;
-  int m_process_number;
-  int m_idx;
-  int m_epollfd;
-  int m_listenfd;
-  int m_stop;
-  process* m_sub_process;
-  static processpool<C, H, M>* m_instance;
+  static const int MAX_PROCESS_NUMBER = 16; /*> 进程池最多提供的进程数量 */
+  static const int USER_PER_PROCESS = 65536;/*> 每个子进程最多能服务的用户数量 */
+  static const int MAX_EVENT_NUMBER = 10000;/*> epoll监听的最大事件数 */
+  int m_process_number; 
+  int m_idx;  /*> 子进程在进程池中的编号，从0开始 */
+  int m_epollfd;  /*> 子进程的epfd */
+  int m_listenfd; /*> 子进程的监听套接字 */
+  int m_stop; /*> 控制子进程是否停止 */
+  process* m_sub_process; /*> 指向子进程数组 */
+
+  static processpool<C, H, M>* m_instance; /*> 指向唯一实例 */
 };
 template <typename C, typename H, typename M>
 processpool<C, H, M>* processpool<C, H, M>::m_instance = NULL;
 
-static int EPOLL_WAIT_TIME = 5000;
-static int sig_pipefd[2];
+static int EPOLL_WAIT_TIME = 5000;  /* epoll_wait的阻塞时间 */
+static int sig_pipefd[2]; /* 用于异步信号的统一事件源 */
+
+// 信号处理程序，用于将信号编号发送给管道读端
 static void sig_handler(int sig) {
   int save_errno = errno;
   int msg = sig;
@@ -80,6 +94,7 @@ static void sig_handler(int sig) {
   errno = save_errno;
 }
 
+// 添加一个信号到信号处理程序
 static void addsig(int sig, void(handler)(int), bool restart = true) {
   struct sigaction sa;
   memset(&sa, '\0', sizeof(sa));
@@ -108,11 +123,12 @@ processpool<C, H, M>::processpool(int listenfd, int process_number)
 
     m_sub_process[i].m_pid = fork();
     assert(m_sub_process[i].m_pid >= 0);
-    if (m_sub_process[i].m_pid > 0) {
+
+    if (m_sub_process[i].m_pid > 0) { // 父进程
       close(m_sub_process[i].m_pipefd[1]);
       m_sub_process[i].m_busy_ratio = 0;
-      continue;
-    } else {
+      continue; // 继续初始化其他子进程
+    } else {  // 子进程
       close(m_sub_process[i].m_pipefd[0]);
       m_idx = i;
       break;
@@ -152,6 +168,7 @@ void processpool<C, H, M>::setup_sig_pipe() {
 
 template <typename C, typename H, typename M>
 void processpool<C, H, M>::run(const vector<H>& arg) {
+  // 可以通过m_idx判断当前进程是否是主进程（只有主进程的m_idx == -1）
   if (m_idx != -1) {
     run_child(arg);
     return;

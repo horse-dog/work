@@ -5,11 +5,14 @@
 
 #include "fdwrapper.h"
 
+// 用于管理连接的类
 class conn {
  public:
   conn();
   ~conn();
+  // 初始化客户端
   void init_clt(int sockfd, const sockaddr_in& client_addr);
+  // 初始化服务端
   void init_srv(int sockfd, const sockaddr_in& server_addr);
   void reset();
   RET_CODE read_clt();
@@ -18,6 +21,7 @@ class conn {
   RET_CODE write_srv();
 
  public:
+  // 缓冲区大小
   static const int BUF_SIZE = 2048;
 
   char* m_clt_buf;

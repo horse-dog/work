@@ -414,6 +414,9 @@ int main() {
   } 
   return 0;
 }
+
+// 依次检验字符串 str1 中的字符，当被检验字符在字符串 str2 中也包含时，则停止检验，并返回该字符位置。
+char *strpbrk(const char *str1, const char *str2);
 ```
 
 - std::string查找相关api

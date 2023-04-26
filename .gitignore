@@ -4,3 +4,5 @@ build
 test.*
 *.pdf
 .DS_Store
+*.o
+springsnail

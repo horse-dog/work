@@ -10,11 +10,12 @@
 
 using std::map;
 
+// 主机类
 class host {
  public:
-  char m_hostname[1024];
-  int m_port;
-  int m_conncnt;
+  char m_hostname[1024];  /*> 主机ip */
+  int m_port; /*> 主机端口 */
+  int m_conncnt;  /*> 最多支持的连接数量 */
 };
 
 class mgr {
