@@ -59,6 +59,8 @@ class processpool {
  private:
   void notify_parent_busy_ratio(int pipefd, M* manager);
   int get_most_free_srv();
+
+  // 一系列过程，包括：创建epoll、初始化信号递送管道（用于统一事件源）、注册几个信号的信号处理程序
   void setup_sig_pipe();
 
   // 主进程的运行逻辑
@@ -118,6 +120,7 @@ processpool<C, H, M>::processpool(int listenfd, int process_number)
   assert(m_sub_process);
 
   for (int i = 0; i < process_number; ++i) {
+    // m_sub_process[i].m_pipefd是全双工的管道哦
     int ret = socketpair(PF_UNIX, SOCK_STREAM, 0, m_sub_process[i].m_pipefd);
     assert(ret == 0);
 
@@ -151,18 +154,26 @@ int processpool<C, H, M>::get_most_free_srv() {
 
 template <typename C, typename H, typename M>
 void processpool<C, H, M>::setup_sig_pipe() {
+  // 创建epoll
   m_epollfd = epoll_create(5);
   assert(m_epollfd != -1);
 
+  // 创建信号递送的管道
   int ret = socketpair(PF_UNIX, SOCK_STREAM, 0, sig_pipefd);
   assert(ret != -1);
 
+  // 设置信号递送管道的写端为非阻塞
   setnonblocking(sig_pipefd[1]);
+
+  // 注册对信号递送管道的读端的可读事件的监听
   add_read_fd(m_epollfd, sig_pipefd[0]);
 
+  // 注册下列三个信号会被递送
   addsig(SIGCHLD, sig_handler);
   addsig(SIGTERM, sig_handler);
   addsig(SIGINT, sig_handler);
+
+  // 注册对SIGPIPE信号的忽略
   addsig(SIGPIPE, SIG_IGN);
 }
 
@@ -186,24 +197,30 @@ template <typename C, typename H, typename M>
 void processpool<C, H, M>::run_child(const vector<H>& arg) {
   setup_sig_pipe();
 
+  // 子进程从1端读管道
   int pipefd_read = m_sub_process[m_idx].m_pipefd[1];
+
+  // 注册这个管道的可读事件
   add_read_fd(m_epollfd, pipefd_read);
 
-  epoll_event events[MAX_EVENT_NUMBER];
+  epoll_event events[MAX_EVENT_NUMBER]; /*> epoll事件数组 */
 
-  M* manager = new M(m_epollfd, arg[m_idx]);
+  M* manager = new M(m_epollfd, arg[m_idx]);  /*> 管理者 */
   assert(manager);
 
-  int number = 0;
+  int number = 0; /*> epoll_wait返回的事件数 */
   int ret = -1;
 
   while (!m_stop) {
     number = epoll_wait(m_epollfd, events, MAX_EVENT_NUMBER, EPOLL_WAIT_TIME);
+
+    // 出错了，而且原因不是信号的中断
     if ((number < 0) && (errno != EINTR)) {
       log(LOG_ERR, __FILE__, __LINE__, "%s", "epoll failure");
       break;
     }
 
+    // epoll_wait超时了，而且没有事件发生
     if (number == 0) {
       manager->recycle_conns();
       continue;

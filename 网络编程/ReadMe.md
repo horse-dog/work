@@ -298,3 +298,27 @@
 - 熟悉GDB断点的实现原理
 
 - 熟悉coredump的调试
+
+#### springsnail
+
+<img src="img/16.png" style="zoom:100%" />
+
+- master进程负责进行反向代理
+
+- 每个worker进程负责与一个对应的逻辑服务器通信
+
+- 每个worker进程与对应的逻辑服务器通信的连接数量有限制，此时这种连接成为一种资源，称之为conn，每个conn都有一个client buffer，一个server buffer，还有一个套接字srvfd，可用于与remote server通信
+
+- 每个worker进程的conn资源通过manager进行管理，manager维护一个正在使用的conn链表和一个空闲的conn链表
+
+- 在fork出多个worker进程之前，listenfd已经建立并且被监听，因此所有worker进程都拥有listenfd实例，但只有master进程在epoll事件里注册了listenfd的可读事件，因此客户连接请求只会被master进程接收到
+
+- 当用户向反向代理服务器（master）发起连接请求时，master选择一个负载最小的（即正在使用的conn数量占该worker总共拥有的conn数量最小的）worker进程，使用管道向这个进程发送一个字节，这个字节的内容不重要，只是用于通知该worker去accept一个连接，因为worker进程拥有listenfd实例，所以可以通过listenfd去accept这个连接。此时，客户端和该worker的通信链路建立完成。
+
+- 客户端最终的要求是和remote server进行通信，remote server可以有多个，它们向客户提供具体的服务。
+
+- 客户端与一个worker的连接建立后，该worker取出一个空闲的conn，该conn负责与remote server进行通信。这样，conn就成为了客户与remote server联系的中转。
+
+- 当客户发送数据时，worker读取内核接收缓冲区到client buffer，当client buffer满时，worker发送client buffer的内容到remote server，这样，客户的数据就能被remote server接收到。
+
+- remote server接收到客户数据后，进行回应，回应的数据会被发送到这个worker进程的这个conn的srvfd，然后该worker读取这个srvfd的内核接收缓冲区到server buffer中，当server buffer满时，worker发送server buffer的内容到客户，这样，remote server回应的数据就能被递送到客户了。

@@ -215,11 +215,6 @@ int main(int argc, char* argv[]) {
   ret = listen(listenfd, 5);
   assert(ret != -1);
 
-  // memset( cfg_host.m_hostname, '\0', 1024 );
-  // memcpy( cfg_host.m_hostname, "127.0.0.1", strlen( "127.0.0.1" ) );
-  // cfg_host.m_port = 54321;
-  // cfg_host.m_conncnt = 5;
-
   // 有多少个逻辑地址，就开启多少个子进程
   processpool<conn, host, mgr>* pool =
       processpool<conn, host, mgr>::create(listenfd, logical_srv.size());

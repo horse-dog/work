@@ -50,23 +50,29 @@ void conn::reset() {
 RET_CODE conn::read_clt() {
   int bytes_read = 0;
   while (true) {
+    // 缓冲区读满了，则返回 BUFFER_FULL
     if (m_clt_read_idx >= BUF_SIZE) {
       log(LOG_ERR, __FILE__, __LINE__, "%s",
           "the client read buffer is full, let server write");
       return BUFFER_FULL;
     }
 
+    // 接收数据到m_clt_buf
     bytes_read =
         recv(m_cltfd, m_clt_buf + m_clt_read_idx, BUF_SIZE - m_clt_read_idx, 0);
+    
     if (bytes_read == -1) {
+      // 这代表内核缓冲区被读空了
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         break;
       }
+      // 否则代表发生了IO错误
       return IOERR;
-    } else if (bytes_read == 0) {
+    } else if (bytes_read == 0) { // 这代表客户端正常关闭了连接
       return CLOSED;
     }
 
+    // 更新读指针
     m_clt_read_idx += bytes_read;
   }
   return ((m_clt_read_idx - m_clt_write_idx) > 0) ? OK : NOTHING;
@@ -75,25 +81,30 @@ RET_CODE conn::read_clt() {
 RET_CODE conn::read_srv() {
   int bytes_read = 0;
   while (true) {
+    // 缓冲区读满了，则返回 BUFFER_FULL
     if (m_srv_read_idx >= BUF_SIZE) {
       log(LOG_ERR, __FILE__, __LINE__, "%s",
           "the server read buffer is full, let client write");
       return BUFFER_FULL;
     }
 
+    // 接收数据到m_srv_buf
     bytes_read =
         recv(m_srvfd, m_srv_buf + m_srv_read_idx, BUF_SIZE - m_srv_read_idx, 0);
     if (bytes_read == -1) {
+      // 这代表内核缓冲区被读空了
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         break;
       }
+      // 否则代表发生了IO错误
       return IOERR;
-    } else if (bytes_read == 0) {
+    } else if (bytes_read == 0) { // 这代表服务端正常关闭了连接
       log(LOG_ERR, __FILE__, __LINE__, "%s",
           "the server should not close the persist connection");
       return CLOSED;
     }
 
+    // 更新读指针
     m_srv_read_idx += bytes_read;
   }
   return ((m_srv_read_idx - m_srv_write_idx) > 0) ? OK : NOTHING;
@@ -102,25 +113,30 @@ RET_CODE conn::read_srv() {
 RET_CODE conn::write_srv() {
   int bytes_write = 0;
   while (true) {
+    // 缓冲区数据被读空了，重置读写指针为0，返回 BUFFER_EMPTY
     if (m_clt_read_idx <= m_clt_write_idx) {
       m_clt_read_idx = 0;
       m_clt_write_idx = 0;
       return BUFFER_EMPTY;
     }
 
+    // 发送用户缓冲区的数据给远程服务器
     bytes_write = send(m_srvfd, m_clt_buf + m_clt_write_idx,
                        m_clt_read_idx - m_clt_write_idx, 0);
     if (bytes_write == -1) {
+      // 这代表内核发送缓冲区满了，过一会儿再重新发送，返回TRY_AGAIN
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         return TRY_AGAIN;
       }
+      // 否则代表发生了IO错误
       log(LOG_ERR, __FILE__, __LINE__, "write server socket failed, %s",
           strerror(errno));
       return IOERR;
-    } else if (bytes_write == 0) {
+    } else if (bytes_write == 0) {  // 这代表服务端正常关闭了连接
       return CLOSED;
     }
 
+    // 更新写指针
     m_clt_write_idx += bytes_write;
   }
 }
@@ -128,25 +144,30 @@ RET_CODE conn::write_srv() {
 RET_CODE conn::write_clt() {
   int bytes_write = 0;
   while (true) {
+    // 缓冲区数据被读空了，重置读写指针为0，返回 BUFFER_EMPTY
     if (m_srv_read_idx <= m_srv_write_idx) {
       m_srv_read_idx = 0;
       m_srv_write_idx = 0;
       return BUFFER_EMPTY;
     }
 
+    // 发送服务端缓冲区的数据给用户
     bytes_write = send(m_cltfd, m_srv_buf + m_srv_write_idx,
                        m_srv_read_idx - m_srv_write_idx, 0);
     if (bytes_write == -1) {
+      // 这代表内核发送缓冲区满了，过一会儿再重新发送，返回TRY_AGAIN
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         return TRY_AGAIN;
       }
+      // 否则代表发生了IO错误
       log(LOG_ERR, __FILE__, __LINE__, "write client socket failed, %s",
           strerror(errno));
       return IOERR;
-    } else if (bytes_write == 0) {
+    } else if (bytes_write == 0) {  // 这代表客户端正常关闭了连接
       return CLOSED;
     }
 
+    // 更新写指针
     m_srv_write_idx += bytes_write;
   }
 }
