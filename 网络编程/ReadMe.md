@@ -322,3 +322,5 @@
 - 当客户发送数据时，worker读取内核接收缓冲区到client buffer，当client buffer满时，worker发送client buffer的内容到remote server，这样，客户的数据就能被remote server接收到。
 
 - remote server接收到客户数据后，进行回应，回应的数据会被发送到这个worker进程的这个conn的srvfd，然后该worker读取这个srvfd的内核接收缓冲区到server buffer中，当server buffer满时，worker发送server buffer的内容到客户，这样，remote server回应的数据就能被递送到客户了。
+
+- 该项目存在的问题：假设cli_buffer为1024字节，客户端发送的了60字节数据，然后等待服务器的响应，此时由于cli_buffer未满，这60字节将永远不会被发送到远程服务器。
