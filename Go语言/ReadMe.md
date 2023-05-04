@@ -137,3 +137,267 @@ import (
   . lib3      // 导入lib3内部的所有变量和函数，使用它们时不再需要 "lib3.func(...)"，慎用
 )
 ```
+
+#### 指针
+
+```go
+package main
+
+import "fmt"
+
+func swap(pa *int, pb *int) {
+	tmp := *pa
+	*pa = *pb
+	*pb = tmp
+}
+
+func main() {
+	a, b := 1, 2
+	swap(&a, &b)
+	fmt.Println(a, b)
+}
+
+```
+
+#### defer
+
+```go
+package main
+
+import "fmt"
+
+// defer 关键字类似于 unix 的 atexit 库函数，并且作用在函数调用
+
+func defer_callback() {
+	fmt.Println("defer...")
+}
+
+func return_callback() int {
+	fmt.Println("return...")
+	return 0
+}
+
+func foo() int {
+	defer defer_callback()
+	return return_callback()
+}
+
+func main() {
+	foo()
+}
+```
+
+#### 数组
+
+- 静态数组：传参时是深拷贝
+
+```go
+arr := [10]int{1, 2, 3, 4}
+```
+
+- 动态数组：传参时是浅拷贝
+
+```go
+arr := []int{1, 2, 3, 4}
+```
+
+- 动态数组：make，nil
+
+- 动态数组：length，cap（类似于c++vector），2倍扩容，指定length和cap：arr := make([]int, 3, 5)
+
+- 动态数组：append：arr = append(arr, 10)
+
+- 动态数组：切片视图（视图即浅拷贝）：arr0 := []int{1, 2, 3}, arr1 := arr0[0:2]
+
+- 动态数组：深拷贝：arr0 := []int{1, 2, 3}, arr1 := make([]int, 3), copy(arr1, arr0)
+
+#### map
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	var map0 map[int]string
+	map0 = make(map[int]string) // 必须有这行，否则段错误
+	map0[0] = "c++"
+	map0[1] = "go"
+	map0[2] = "java"
+
+	map1 := make(map[int]string)
+	map1[0] = "c++"
+	map1[1] = "go"
+	map1[2] = "java"
+
+	map2 := map[int]string{1: "c++", 2: "go", 3: "java"}
+	fmt.Println(map0)
+	fmt.Println(map1)
+	fmt.Println(map2)
+
+	// 增删改查
+	map2[4] = "C#"
+	delete(map2, 4)
+	map2[3] = "C#"
+	value, ok := map2[4]
+	if ok {
+		fmt.Println("map2[4] =", value)
+	} else {
+		fmt.Println("map2[4] = null")
+	}
+
+	for key, val := range map2 {
+		fmt.Println(key, val)
+	}
+}
+```
+
+#### 面向对象
+
+- 类的定义
+
+```go
+package main
+
+import (
+	"fmt"
+)
+
+type vector []int // c++: using vector = std::vector<int>;
+
+type book struct {
+	name  string /*> 书名 */
+	price int    /*> 价格 */
+}
+
+func changePrice(x *book) {
+	x.price = 30
+}
+
+func (this *book) getPrice() int {
+	return this.price
+}
+
+// 操作是在一个右值副本里进行的，无法更改对象的属性
+func (this book) setPriceErr(price int) {
+	this.price = price
+}
+
+// 正确的实现
+func (this *book) setPrice(price int) {
+	this.price = price
+}
+
+func main() {
+	var vc vector = vector{1, 2, 3}
+	fmt.Println(vc)
+
+	x := book{"go", 20}
+	fmt.Println(x)
+	changePrice(&x)
+	fmt.Println(x)
+	x.setPrice(40)
+	x.setPriceErr(50)
+	fmt.Println(x)
+}
+```
+
+- 继承和覆盖
+
+```go
+package main
+
+import "fmt"
+
+type Point2 struct {
+	x int
+	y int
+}
+
+type Point3 struct {
+	Point2
+	z int
+}
+
+func (this *Point2) disp() {
+	fmt.Println(this.x, this.y)
+}
+
+func (this *Point3) disp() {
+	fmt.Println(this.x, this.y, this.z)
+}
+
+func main() {
+	p0 := Point2{0, 1}
+	p1 := Point3{p0, 2}
+	p0.disp()
+	p1.disp()
+}
+```
+
+- 接口、多态、重写
+
+```go
+package main
+
+import "fmt"
+
+type Calculator interface {
+	Execute(int, int) int
+}
+
+type Add struct {
+	Calculator // 实现Calculator接口
+}
+
+type Sub struct {
+	Calculator // 实现Calculator接口
+}
+
+func (this *Add) Execute(x int, y int) int {
+	return x + y
+}
+
+func (this *Sub) Execute(x int, y int) int {
+	return x - y
+}
+
+func Calculate(c Calculator, x int, y int) int {
+	return c.Execute(x, y)
+}
+
+func main() {
+	a := Add{}
+	b := Sub{}
+	fmt.Println(Calculate(&a, 3, 2))
+	fmt.Println(Calculate(&b, 3, 2))
+}
+```
+
+#### 万能引用
+
+```go
+package main
+
+import "fmt"
+
+// universal reference
+func disp(obj interface{}) {
+	fmt.Println(obj)
+	value, ok := obj.([]int) // type assert: is obj slice<int> type?
+	if ok {
+		value[0] = 123
+	}
+}
+
+func main() {
+	arr0 := [3]int{1, 2, 3}
+	arr1 := []int{1, 2, 3}
+	disp(123)
+	disp("hello")
+	disp(arr0)
+	disp(arr1)
+	fmt.Println(arr0)
+	fmt.Println(arr1)
+}
+```
