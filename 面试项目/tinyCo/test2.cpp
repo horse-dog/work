@@ -2,8 +2,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <coroutine>
 #include <deque>
-#include <experimental/coroutine>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -11,9 +11,6 @@
 #include <vector>
 using namespace std;
 using namespace chrono;
-using namespace experimental;
-
-uint64_t ivkcnt = 0;
 
 template <class T>
 class Future;
@@ -25,7 +22,7 @@ class Schedular;
 
 void resume_handle(coroutine_handle<> handle);
 
-void set_result(Promise<float> &promise, float second);
+void set_result(Promise<float>& promise, float second);
 
 class SharedStateBase : public enable_shared_from_this<SharedStateBase> {
   friend class Schedular;
@@ -246,7 +243,6 @@ class Schedular {
       typename invoke_result_t<F&&, Args&&...>::result_type {
     auto future = forward<F>(fn)(forward<Args>(args)...);
     while (!future.await_ready()) {
-      ivkcnt++;
       poll();
     }
     return future.await_resume();
@@ -316,7 +312,7 @@ void SharedState<T>::post_all_callbacks() {
 
 Future<float> func(Schedular& schedular) {
   cout << "start sleep\n";
-  auto r = co_await schedular.delay(5);
+  auto r = co_await schedular.delay(1.2);
   co_return r;
 }
 
@@ -331,7 +327,7 @@ void resume_handle(coroutine_handle<> handle) {
   handle.resume();
 }
 
-void set_result(Promise<float> &promise, float second) {
+void set_result(Promise<float>& promise, float second) {
   cout << "set result " << second << endl;
   promise.set_result(second);
 }
@@ -342,5 +338,4 @@ int main() {
   auto r = schedular.run_until_complete(func2, schedular);
 
   cout << "run complete with " << r << "\n";
-  cout << ivkcnt << endl;
 }
