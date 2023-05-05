@@ -39,6 +39,10 @@ int main(int argc, char* argv[]) {
   memset(cfg_file, '\0', 100);
   int option;
 
+  // argc = 4;
+  // const char* xx[] = {"-x", "-f", "./config.xml"};
+  // argv = (char**)xx;
+
   // getopt函数用于解析参数，其中f:表示选项f后面必须带有参数，x、v、h选项是普通选项，不需要附加参数
   while ((option = getopt(argc, argv, "f:xvh")) != -1) {
     switch (option) {

@@ -1,12 +1,12 @@
-Listen 10.194.70.225:12345
+Listen 127.0.0.1:12344
 
 <logical_host>
-  <name>10.194.70.225</name>
-  <port>13579</port>
+  <name>127.0.0.1</name>
+  <port>12345</port>
   <conns>5</conns>
 </logical_host>
 <logical_host>
-  <name>10.194.70.79</name>
-  <port>13579</port>
+  <name>127.0.0.1</name>
+  <port>12346</port>
   <conns>5</conns>
 </logical_host>
