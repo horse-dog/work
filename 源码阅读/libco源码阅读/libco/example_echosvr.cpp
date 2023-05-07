@@ -81,6 +81,9 @@ static void *readwrite_routine(void *arg) {
       co_poll(co_get_epoll_ct(), &pf, 1, 1000);
 
       int ret = read(fd, buf, sizeof(buf));
+      if (ret < 0) {
+        printf("ret < 0\n");
+      }
       if (ret > 0) {
         ret = write(fd, buf, ret);
       }
@@ -93,6 +96,7 @@ static void *readwrite_routine(void *arg) {
   }
   return 0;
 }
+
 int co_accept(int fd, struct sockaddr *addr, socklen_t *len);
 static void *accept_routine(void *) {
   co_enable_hook_sys();
@@ -121,6 +125,7 @@ static void *accept_routine(void *) {
       continue;
     }
     if (g_readwrite.empty()) {
+      printf("close fd\n");
       close(fd);
       continue;
     }
@@ -172,19 +177,22 @@ static int CreateTcpSocket(const unsigned short shPort /* = 0 */,
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 5) {
-    printf(
-        "Usage:\n"
-        "example_echosvr [IP] [PORT] [TASK_COUNT] [PROCESS_COUNT]\n"
-        "example_echosvr [IP] [PORT] [TASK_COUNT] [PROCESS_COUNT] -d   # "
-        "daemonize mode\n");
-    return -1;
-  }
-  const char *ip = argv[1];
-  int port = atoi(argv[2]);
-  int cnt = atoi(argv[3]);
-  int proccnt = atoi(argv[4]);
-  bool deamonize = argc >= 6 && strcmp(argv[5], "-d") == 0;
+  // if (argc < 5) {
+  //   printf(
+  //       "Usage:\n"
+  //       "example_echosvr [IP] [PORT] [TASK_COUNT] [PROCESS_COUNT]\n"
+  //       "example_echosvr [IP] [PORT] [TASK_COUNT] [PROCESS_COUNT] -d   # "
+  //       "daemonize mode\n");
+  //   return -1;
+  // }
+  // const char *ip = argv[1];
+  // int port = atoi(argv[2]);
+  // int cnt = atoi(argv[3]);
+  // int proccnt = atoi(argv[4]);
+  // bool deamonize = argc >= 6 && strcmp(argv[5], "-d") == 0;
+  const char *ip = "127.0.0.1";
+  int port = 12345;
+  int cnt = 2;
 
   g_listen_fd = CreateTcpSocket(port, ip, true);
   listen(g_listen_fd, 1024);
@@ -196,28 +204,40 @@ int main(int argc, char *argv[]) {
 
   SetNonBlock(g_listen_fd);
 
-  for (int k = 0; k < proccnt; k++) {
-    pid_t pid = fork();
-    if (pid > 0) {
-      continue;
-    } else if (pid < 0) {
-      break;
-    }
-    for (int i = 0; i < cnt; i++) {
-      task_t *task = (task_t *)calloc(1, sizeof(task_t));
-      task->fd = -1;
+  // for (int k = 0; k < proccnt; k++) {
+  //   pid_t pid = fork();
+  //   if (pid > 0) {
+  //     continue;
+  //   } else if (pid < 0) {
+  //     break;
+  //   }
+  //   for (int i = 0; i < cnt; i++) {
+  //     task_t *task = (task_t *)calloc(1, sizeof(task_t));
+  //     task->fd = -1;
 
-      co_create(&(task->co), NULL, readwrite_routine, task);
-      co_resume(task->co);
-    }
-    stCoRoutine_t *accept_co = NULL;
-    co_create(&accept_co, NULL, accept_routine, 0);
-    co_resume(accept_co);
+  //     co_create(&(task->co), NULL, readwrite_routine, task);
+  //     co_resume(task->co);
+  //   }
+  //   stCoRoutine_t *accept_co = NULL;
+  //   co_create(&accept_co, NULL, accept_routine, 0);
+  //   co_resume(accept_co);
 
-    co_eventloop(co_get_epoll_ct(), 0, 0);
+  //   co_eventloop(co_get_epoll_ct(), 0, 0);
 
-    exit(0);
+  //   exit(0);
+  // }
+  // if (!deamonize) wait(NULL);
+  for (int i = 0; i < cnt; i++) {
+    task_t *task = (task_t *)calloc(1, sizeof(task_t));
+    task->fd = -1;
+
+    co_create(&(task->co), NULL, readwrite_routine, task);
+    co_resume(task->co);
   }
-  if (!deamonize) wait(NULL);
+  stCoRoutine_t *accept_co = NULL;
+  co_create(&accept_co, NULL, accept_routine, 0);
+  co_resume(accept_co);
+
+  co_eventloop(co_get_epoll_ct(), 0, 0);
   return 0;
 }

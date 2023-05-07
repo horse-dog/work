@@ -23,6 +23,7 @@
 coctx_swap:
 
 #if defined(__i386__)
+# &(curr->ctx) in %edi, &(pending_co->ctx) in %esi
     movl 4(%esp), %eax
     movl %esp,  28(%eax)
     movl %ebp, 24(%eax)
@@ -45,7 +46,8 @@ coctx_swap:
 	ret
 
 #elif defined(__x86_64__)
-	leaq (%rsp),%rax
+# &(curr->ctx) in %edi, &(pending_co->ctx) in %esi
+	  leaq (%rsp),%rax
     movq %rax, 104(%rdi)
     movq %rbx, 96(%rdi)
     movq %rcx, 88(%rdi)

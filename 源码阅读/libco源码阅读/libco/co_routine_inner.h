@@ -37,8 +37,8 @@ struct stCoSpec_t {
 struct stStackMem_t {
   stCoRoutine_t *occupy_co; /*> 当前正在使用该栈的协程 */
   int stack_size;           /*> 栈的大小 */
-  char *stack_bp;           /*> 栈基址，stack_buffer + stack_size */
-  char *stack_buffer;       /*> 栈顶 */
+  char *stack_bp;           /*> 栈基址 */
+  char *stack_buffer;       /*> 栈顶，stack_bp = stack_buffer + stack_size */
 };
 
 // 共享栈数组
@@ -67,8 +67,7 @@ struct stCoRoutine_t {
 
   stStackMem_t *stack_mem; /*> 指向栈内存 */
 
-  // save satck buffer while confilct on same stack_buffer;
-  char *stack_sp; /*> save_buffer的栈顶（or栈底？） */  // TODO
+  char *stack_sp; /*> 当前协程的栈的栈顶，假设当前协程的栈内push了x个字节，则 stack_sp = stack_mem->stack_bp - x */
   unsigned int save_size; /*> save_buffer的大小 */
   char *save_buffer; /*> 当协程挂起时，栈的内容会暂存到save_buffer中 */
 
@@ -76,14 +75,26 @@ struct stCoRoutine_t {
 };
 
 /**
- * @brief 初始化当前线程的协程管理器
+ * @brief 初始化当前线程的协程运行环境
+ * 该函数创建当前线程的协程运行环境，并且创建主协程
  */
 void co_init_curr_thread_env();
 
+// 获取当前线程的协程运行环境
 stCoRoutineEnv_t *co_get_curr_thread_env();
 
-// 2.coroutine
+/**
+ * @brief 释放协程co
+ *
+ * @param co 指向一个协程
+ */
 void co_free(stCoRoutine_t *co);
+
+/**
+ * @brief yield指定协程环境中正在调度的协程
+ *
+ * @param env 指定一个协程环境
+ */
 void co_yield_env(stCoRoutineEnv_t *env);
 
 // 超时链表结点
@@ -138,17 +149,20 @@ stCoEpoll_t *AllocEpoll();
  */
 void FreeEpoll(stCoEpoll_t *ctx);
 
+/**
+ * @brief 获取当前线程正在调度的协程
+ *
+ * @return stCoRoutine_t* 指向协程的指针
+ */
 stCoRoutine_t *GetCurrThreadCo();
 
 /**
  * @brief 设置指定协程管理器的管理epoll的结构体
- * 
+ *
  * @param env 协程管理器
  * @param ev 指向管理epoll的结构体
  */
 void SetEpoll(stCoRoutineEnv_t *env, stCoEpoll_t *ev);
-
-typedef void (*pfnCoRoutineFunc_t)();
 
 #endif
 
