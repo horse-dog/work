@@ -28,7 +28,7 @@ available.
  */
 struct stCoRoutineEnv_t;
 
-// TODO
+// co local变量
 struct stCoSpec_t {
   void *value;
 };
@@ -43,7 +43,7 @@ struct stStackMem_t {
 
 // 共享栈数组
 struct stShareStack_t {
-  unsigned int alloc_idx; /* TODO */
+  unsigned int alloc_idx; /* 当前共享栈数组分配的索引 */
   int stack_size; /* 每个共享栈的大小都一样，为stack_size */
   int count;      /* 共享栈数组长度 */
   stStackMem_t **stack_array; /* 指向共享栈数组 */
@@ -63,7 +63,7 @@ struct stCoRoutine_t {
   char cEnableSysHook; /*> 是否打开钩子标识，默认关闭 */
   char cIsShareStack;  /*> 是否使用共享栈 */
 
-  void *pvEnv; /* TODO */
+  void *pvEnv; /* 存储该协程的环境变量 */
 
   stStackMem_t *stack_mem; /*> 指向栈内存 */
 
@@ -71,7 +71,7 @@ struct stCoRoutine_t {
   unsigned int save_size; /*> save_buffer的大小 */
   char *save_buffer; /*> 当协程挂起时，栈的内容会暂存到save_buffer中 */
 
-  stCoSpec_t aSpec[1024]; /* TODO */
+  stCoSpec_t aSpec[1024]; /* 存储co local变量的数组 */
 };
 
 /**

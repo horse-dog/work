@@ -81,9 +81,6 @@ static void *readwrite_routine(void *arg) {
       co_poll(co_get_epoll_ct(), &pf, 1, 1000);
 
       int ret = read(fd, buf, sizeof(buf));
-      if (ret < 0) {
-        printf("ret < 0\n");
-      }
       if (ret > 0) {
         ret = write(fd, buf, ret);
       }

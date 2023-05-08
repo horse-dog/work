@@ -108,13 +108,19 @@ int coctx_make(coctx_t* ctx, coctx_pfn_t pfn, const void* s, const void* s1) {
 }
 #elif defined(__x86_64__)
 int coctx_make(coctx_t* ctx, coctx_pfn_t pfn, const void* s, const void* s1) {
+  // 这里腾出8字节，用于存放返回地址，也就是pfn的地址（因为调用这个函数的协程还没还是运行）
   char* sp = ctx->ss_sp + ctx->ss_size - sizeof(void*);
+  // 这里是为了16字节对齐（见深入理解计算机系统）
+  // -16LL = fffffffffffffff0
   sp = (char*)((unsigned long)sp & -16LL);
 
   memset(ctx->regs, 0, sizeof(ctx->regs));
+
+  // 设置返回地址
   void** ret_addr = (void**)(sp);
   *ret_addr = (void*)pfn;
 
+  // 协程运行开始前，最重要的信息只有rdi，rsi，rsp和返回地址
   ctx->regs[kRSP] = sp;
 
   ctx->regs[kRETAddr] = (char*)pfn;
