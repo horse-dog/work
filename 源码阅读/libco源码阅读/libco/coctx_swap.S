@@ -77,6 +77,10 @@ coctx_swap:
     movq 80(%rsi), %rdx   # 恢复 pending_co 的 %rdx
     movq 88(%rsi), %rcx   # 恢复 pending_co 的 %rcx
     movq 96(%rsi), %rbx   # 恢复 pending_co 的 %rbx
+
+    # 由于共享栈机制，当前栈空间中的返回地址不一定是本协程的返回地址，
+    # 这个栈可能之前被其他协程使用过，此时这个返回地址是返回到其他协程的调用点的，
+    # 因此我们需要手动恢复这个返回地址
 		leaq 8(%rsp), %rsp    # 栈顶后退8字节，用于存放新的返回地址
 		pushq 72(%rsi)        # 恢复 pending_co 的 返回地址
 

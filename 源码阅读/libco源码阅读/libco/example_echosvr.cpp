@@ -224,6 +224,7 @@ int main(int argc, char *argv[]) {
   //   exit(0);
   // }
   // if (!deamonize) wait(NULL);
+  
   for (int i = 0; i < cnt; i++) {
     task_t *task = (task_t *)calloc(1, sizeof(task_t));
     task->fd = -1;
