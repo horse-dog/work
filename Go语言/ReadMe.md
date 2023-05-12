@@ -401,3 +401,180 @@ func main() {
 	fmt.Println(arr1)
 }
 ```
+
+#### 反射
+
+```go
+package main
+
+import (
+	"fmt"
+	"reflect"
+)
+
+type Foo struct {
+	Name string
+	Age  int
+}
+
+func (this *Foo) Disp() {
+	fmt.Println(*this)
+}
+
+func reflectType(arg interface{}) {
+	typeinfo := reflect.TypeOf(arg)
+	reflectValue := reflect.ValueOf(arg)
+
+	if typeinfo.Kind() == reflect.Ptr {
+		typeinfo = typeinfo.Elem()
+		reflectValue = reflectValue.Elem()
+	}
+
+	fmt.Println("arg's type is:", typeinfo.Name())
+	for i := 0; i < typeinfo.NumField(); i++ {
+		fieldinfo := typeinfo.Field(i)
+		var v = reflectValue.Field(i).Interface()
+		fmt.Printf("field: %v(%v) = %v\n", fieldinfo.Name, fieldinfo.Type, v)
+	}
+
+	for i := 0; i < reflect.TypeOf(arg).NumMethod(); i++ {
+		method := reflect.TypeOf(arg).Method(i)
+		fmt.Printf("method: %v(%v)\n", method.Name, method.Type)
+		reflect.ValueOf(arg).Method(i).Call(nil)
+	}
+}
+
+func main() {
+	x := Foo{"xxx", 111}
+	reflectType(&x)
+}
+```
+
+#### Tag与json解析
+
+```go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
+
+type Movie struct {
+	Title  string   `json:"title"`
+	Year   int      `json:"year"`
+	Price  int      `json:"rmb"`
+	Actors []string `json:"actors"`
+}
+
+func main() {
+	movie := Movie{"JokeKing", 2000, 10, []string{"zyc, zbz"}}
+	json_str, _ := json.Marshal(movie)
+	fmt.Println((string)(json_str))
+	movie = Movie{}
+	json.Unmarshal(json_str, &movie)
+	fmt.Println(movie)
+}
+```
+
+#### goroutine
+
+- go: go callable
+
+- channel: 
+
+	- 当管道大小为1时，向管道写数据后会阻塞直到另一个协程从管道中取出该数据，从管道读数据会阻塞直到管道非空
+
+	- 当管道大小大于1时，只要管道没有满，写数据就不会发生阻塞；而从管道读数据则会阻塞直到管道非空
+
+```go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	c := make(chan int)
+	go func() {
+		defer fmt.Println("goroutine finished...")
+		fmt.Println("goroutine running...")
+		c <- 666
+	}()
+
+	time.Sleep(time.Second)
+	num := <-c
+	fmt.Println("num = ", num)
+	fmt.Println("main goroutine finished...")
+	time.Sleep(time.Second)
+}
+```
+
+- range
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	c := make(chan int)
+	go func() {
+		for i := 0; i < 5; i++ {
+			c <- i
+		}
+		close(c)
+	}()
+
+	for data := range c {
+		fmt.Println(data)
+	}
+
+	fmt.Println("Main Finished...")
+}
+```
+
+- select
+
+```go
+package main
+
+import "fmt"
+
+func fibnacii(c, quit chan int) {
+	x, y := 1, 1
+
+	for {
+		select {
+		case c <- x:
+			tmp := x
+			x = y
+			y = tmp + y
+		case <-quit:
+			fmt.Println("quit")
+			return
+		}
+
+	}
+}
+
+func main() {
+	c := make(chan int)
+	quit := make(chan int)
+
+	go func() {
+		for i := 0; i < 10; i++ {
+			fmt.Println(<-c)
+		}
+		quit <- 0
+	}()
+
+	fibnacii(c, quit)
+}
+```
+
+#### 模块管理
+
+- go mod init

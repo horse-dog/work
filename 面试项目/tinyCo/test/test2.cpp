@@ -20,10 +20,6 @@ class Promise;
 
 class Schedular;
 
-void resume_handle(coroutine_handle<> handle);
-
-void set_result(Promise<float>& promise, float second);
-
 class SharedStateBase : public enable_shared_from_this<SharedStateBase> {
   friend class Schedular;
 
@@ -166,8 +162,7 @@ class Future {
   // 协程接口
   bool await_ready() { return _state->settled; }
   void await_suspend(coroutine_handle<> handle) {
-    auto cb = bind(resume_handle, handle);
-    add_finish_callback(cb);
+    add_finish_callback([=](T&) mutable { handle.resume(); });
   }
   T await_resume() { return _state->value; }
 
@@ -270,8 +265,9 @@ class Schedular {
    */
   Future<float> delay(float second) {
     auto promise = Promise<float>(*this);
-    auto cb = bind(set_result, promise, second);
-    add_timer(false, second, cb);
+    add_timer(false, second, [=]() mutable {
+      promise.set_result(second);
+    });
     return promise.get_future();
   }
 
@@ -320,16 +316,6 @@ Future<int> func2(Schedular& schedular) {
   auto r = co_await func(schedular);
   cout << "slept for " << r << "s\n";
   co_return 42;
-}
-
-void resume_handle(coroutine_handle<> handle) {
-  cout << "resume handle\n";
-  handle.resume();
-}
-
-void set_result(Promise<float>& promise, float second) {
-  cout << "set result " << second << endl;
-  promise.set_result(second);
 }
 
 int main() {
