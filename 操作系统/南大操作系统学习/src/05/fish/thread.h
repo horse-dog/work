@@ -7,7 +7,6 @@
 #include <pthread.h>
 
 #define NTHREAD 64
-typedef void(*routFn)(int);
 enum { T_FREE = 0, T_LIVE, T_DEAD, };
 struct thread {
   int id, status;
@@ -26,9 +25,9 @@ void *wrapper(void *arg) {
 void create(void *fn) {
   assert(tptr - tpool < NTHREAD);
   *tptr = (struct thread) {
-    .id = (int)(tptr - tpool) + 1,
+    .id = tptr - tpool + 1,
     .status = T_LIVE,
-    .entry = (routFn)fn,
+    .entry = fn,
   };
   pthread_create(&(tptr->thread), NULL, wrapper, tptr);
   ++tptr;

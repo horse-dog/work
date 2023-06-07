@@ -26,7 +26,7 @@ void *wrapper(void *arg) {
 void create(void *fn) {
   assert(tptr - tpool < NTHREAD);
   *tptr = (struct thread) {
-    .id = (int)(tptr - tpool) + 1,
+    .id = tptr - tpool + 1,
     .status = T_LIVE,
     .entry = (routFn)fn,
   };
