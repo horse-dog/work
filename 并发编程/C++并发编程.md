@@ -570,8 +570,27 @@ void Consume() {
 
 - 惊群效应：多个进程/线程等待一个唤醒的情况叫做惊群效应。
 
-TODO
-- nginx解决惊群效应的方法：
+  - accept导致的惊群：这个问题其实在linux2.6内核版本就已经解决了,它维护了一个等待队列(队列的元素为进程),并且使用了WQ_FLAG_EXCLUSIVE标志位(互斥标志位),非exclusive元素会加在等待队列的前面,而exclusive元素会加在等待队列的末尾,当有新连接到来时,会遍历等待队列,并且只唤醒第一个exclusive进程(非互斥的进程由于排在队列前面也会被唤醒)就退出遍历。
+
+  - epoll_wait导致的惊群：虽然accept上已经不存在惊群问题了,但是以目前的服务器架构,都不会简单的使用accept阻塞等待新的连接了,而是使用epoll等I/O多路复用机制。早期的linux,调用epoll_wait后,当有读/写事件发生时,会唤醒阻塞在epoll_wait上的所有进程/线程,造成惊群现象。不过这个问题已经被修复了,使用类似于处理accpet导致的惊群问题的方法,当有事件发生时,只会唤醒等待队列中的第一个exclusive进程来处理。不过随后就可以看到,这种方法并不能完全解决惊群问题。
+
+  - 这里需要区分一下两种不同的情况(这两种情况,目前linux内核都有处理的办法)。 
+
+    - 多个进程/线程使用同一个epfd然后调用epoll_wait 
+  
+    - 多个进程/线程有自己的epfd,然后监听同一个socket
+
+  - 其实也就是epoll_create和fork这两个函数调用的先后顺序问题(下面都以进程为例)。第一种情况,先调用epoll_create获取epfd,再使用fork,各进程共用同一个epfd;第二种情况,先fork,再调用epoll_create,各进程独享自己的epfd。
+
+  - 而nginx面对的是第二种情况,这点需要分清楚(网上有很多用第一种情况来引入nginx处理惊群问题的方法,不要被混淆了)。因为nginx的每个worker进程相互独立,拥有自己的epfd,不过根据配置文件中的listen指令都监听了同一个端口,调用epoll_wait时,若共同监听的套接字有事件发生,就会造成每个worker进程都被唤醒。
+  
+- Nginx 惊群问题的解决方法
+
+  - 方法一：accept_mutex。如果开启了accept_mutex 锁，每个 worker 都会先去抢自旋锁，只有抢占成功了，才把 socket 加入到 epoll 中，accept 请求，然后释放锁。accept_mutex 锁也有负载均衡的作用。
+
+  - 方法二：EPOLLEXCLUSIVE。EPOLLEXCLUSIVE 是 Linux 4.5+ 内核新添加的一个 epoll 的标识，Nginx 在 1.11.3 之后添加了 NGX_EXCLUSIVE_EVENT。EPOLLEXCLUSIVE 标识会保证一个事件发生时候只有一个线程会被唤醒，以避免多个进程监听下的“惊群”问题。不过任一时候只能有一个工作线程调用 accept，限制了真正并行的吞吐量。
+
+  - 方法三：SO_REUSEPORT。是惊群最好的解决方法，Nginx 在 1.9.1 中加入了这个选项，每个 worker 进程都有自己的 socket，这些 socket 都 bind 同一个端口。当新请求到来时，内核根据四元组信息进行负载均衡，非常高效。
 
 ### std::atomic_flag
 
