@@ -306,6 +306,7 @@ static_assert(true/false, message);
 
   ```cpp
   #include <atomic>
+  using namespace std;
 
   template <class T>
   struct Deleter {
