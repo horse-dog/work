@@ -198,7 +198,9 @@ static_assert(true/false, message);
 
   - shared_ptr的实现原理是引用计数，引用计数分强引用计数和弱引用计数
 
-  - 三张图解释为什么 std::shared_ptr 需要保存弱引用计数 weak_count
+  - 不知道大家有没有注意到一个问题，为什么在计数器初始化的时候就要将弱引用计数设置为1呢？若弱引用计数初始化为0，在强引用计数不为0的情况下，weak_ptr对象生命期都结束时，此时弱引用计数为0，就会删除计数器，但这时share_ptr对象尚在使用、资源也未释放，就会出现内存错误。
+
+  - 三张图解释为什么 std::shared_ptr 需要保存弱引用计数 weak_count (最左边图有误，weak_count=3)
 
     <img src="img/1.png" style="zoom:100%" />
 
