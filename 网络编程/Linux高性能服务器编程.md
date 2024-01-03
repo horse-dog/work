@@ -266,10 +266,12 @@
 - HTTP请求头示例
 
   ```text
-  GET http://www.baidu.com/index.html HTTP/1.0
-  User-Agent: Wget/1.12 (linux-gnu)
-  Host: www.baidu.com
-  Connection: close
+  GET http://www.baidu.com/index.html HTTP/1.0\r\n
+  User-Agent: Wget/1.12 (linux-gnu)\r\n
+  Host: www.baidu.com\r\n
+  Connection: close\r\n
+  \r\n
+  [Request Body]
   ```
 - HTTP请求方法
 
@@ -527,6 +529,8 @@ int shutdown(int sockfd, int howto);
 ### 数据读写
 
 #### TCP数据读写
+
+<img src="img/17.png" style="zoom:100%" />
 
 ```cpp
 #include <sys/types.h>
