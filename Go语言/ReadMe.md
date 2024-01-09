@@ -347,11 +347,9 @@ type Calculator interface {
 }
 
 type Add struct {
-	Calculator // 实现Calculator接口
 }
 
 type Sub struct {
-	Calculator // 实现Calculator接口
 }
 
 func (this *Add) Execute(x int, y int) int {
@@ -578,3 +576,25 @@ func main() {
 #### 模块管理
 
 - go mod init
+
+
+#### 可变参数
+
+```go
+func Greeting(prefix string, who ...string) {
+	if who == nil {
+		fmt.Printf("Nobody to say hi")
+		return
+	}
+
+	for _, people := range who {
+		fmt.Printf("%s, %s\n", prefix, people)
+	}
+}
+
+Greeting("nobody")
+Greeting("hello:", "Joe", "Anna", "Eileen")
+
+guest := []string{"Joe", "Anna", "Eileen"}
+Greeting("hello:", guest...)
+```

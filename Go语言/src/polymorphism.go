@@ -1,17 +1,17 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Calculator interface {
 	Execute(int, int) int
 }
 
 type Add struct {
-	Calculator // 实现Calculator接口
 }
 
 type Sub struct {
-	Calculator // 实现Calculator接口
 }
 
 func (this *Add) Execute(x int, y int) int {

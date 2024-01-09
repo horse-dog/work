@@ -135,9 +135,16 @@ type schedt struct {
 - 主动调度: 一种用户主动执行让渡的方式，主要方式是，用户在执行代码中调用了 runtime.Gosched 方法，此时当前 g 会当让出执行权，主动进入队列等待下次被调度执行.
 
     ```go
+    // 加入全局队列
     func Gosched() {
         checkTimeouts()
         mcall(gosched_m)
+    }
+
+    // 加入本地runq
+    func goyield() {
+        checkTimeouts()
+	    mcall(goyield_m)
     }
     ```
 
