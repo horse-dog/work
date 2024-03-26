@@ -365,7 +365,7 @@ void strncpy(char* dst, const char* src, size_t n);
 void strcat(char* dst, const char* src);
 
 // 在尾部追加字符串，追加超过n会被截断
-void strncat(char* dst, const char* src);
+void strncat(char* dst, const char* src, size_t n);
 
 // 计算字符串长度
 size_t strlen(const char* str);
@@ -374,13 +374,13 @@ size_t strlen(const char* str);
 int strcmp(const char *s1, const char *s2);
 
 // 按字典序比较字符串，比较长度不超过n
-int strcmp(const char *s1, const char *s2, size_t n);
+int strncmp(const char *s1, const char *s2, size_t n);
 
 // 按字典序比较字符串，不区分大小写
 int strcasecmp(const char *s1, const char *s2);
 
 // 按字典序比较字符串，不区分大小写，比较长度不超过n
-int strncasecmp(const char *s1, const char *s2);
+int strncasecmp(const char *s1, const char *s2, size_t n);
 
 // 寻找指定字符在字符串中的位置，如果没找到，返回NULL
 char *strchr(char *str, int c);

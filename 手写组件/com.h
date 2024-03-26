@@ -134,85 +134,121 @@ class Semaphore {
 };
 
 // 可伸缩线程池
-class ThreadPool {
- public:
-  ThreadPool(int min, int max, int linger)
-      : tskQptr(std::make_shared<taskQ>(min, max, linger)) {}
+#include <unistd.h>
+#include <sys/syscall.h>
+pid_t GetThreadID() {
+  pid_t tid;
+  tid = syscall(SYS_gettid);
+  return tid;
+}
 
-  ~ThreadPool() {
-    if (static_cast<bool>(tskQptr)) {
+
+class thread_pool {
+
+public:
+  thread_pool(int min_workers, int max_workers, int linger) 
+  : m_tasks(std::make_shared<TaskQ>(min_workers, max_workers, linger))
+  { }
+
+  thread_pool(const thread_pool&) = delete;
+
+  thread_pool& operator=(const thread_pool&) = delete;
+
+  ~thread_pool() {
+    if (m_tasks) {
       {
-        std::lock_guard locker(tskQptr->mtx);
-        tskQptr->exit = true;
+        std::lock_guard<std::mutex> lock(m_tasks->mtx);
+        m_tasks->exit = true;
       }
-      tskQptr->cv.notify_all();
+      m_tasks->cv.notify_all();
     }
-    for (auto&& t : threads) t.join();
-  }
-
-  template <class F>
-  void addTask(F&& task) {
-    {
-      std::lock_guard locker(tskQptr->mtx);
-      tskQptr->tasks.emplace_back(std::forward<F>(task));
-    }
-    if (tskQptr->idleCnt > 0)
-      tskQptr->cv.notify_one();
-    else if (threads.size() < tskQptr->maxWorkers) {
-      createWorker();
+    for (auto&& thread : m_threads) {
+      if (thread.joinable()) {
+        thread.join();
+      }
     }
   }
 
-  void createWorker() {
-    threads.emplace_back([taskQPtr = tskQptr] {
-      std::unique_lock locker(taskQPtr->mtx);
-      taskQPtr->idleCnt++;
+  template <class _Fn>
+  void addTask(_Fn&& __f) {
+    m_tasks->mtx.lock();
+    m_tasks->tasks.emplace_back(std::forward<_Fn>(__f));
+    if (m_tasks->num_idle > 0) {
+      m_tasks->mtx.unlock();
+      m_tasks->cv.notify_one();
+      return;
+    }
+    
+    if (m_threads.size() < m_tasks->max_workers) {
+      __createWorker();
+    }
+    m_tasks->mtx.unlock();
+  }
+
+protected:
+  void __createWorker() {
+    m_threads.emplace_back([taskQ = m_tasks, this] {
+      printf("%d: start...\n", GetThreadID());
+      std::unique_lock<std::mutex> lock(taskQ->mtx);
+      ++taskQ->num_idle;
       while (true) {
-        if (!taskQPtr->tasks.empty()) {
-          auto task = std::move(taskQPtr->tasks.front());
-          taskQPtr->tasks.pop_front();
-          taskQPtr->idleCnt--;
-          locker.unlock();
-          std::invoke(task);
-          locker.lock();
-          taskQPtr->idleCnt++;
-        } else if (taskQPtr->exit) {
-          taskQPtr->idleCnt--;
+        if (!taskQ->tasks.empty()) {
+          // get and exec.
+          auto task = taskQ->tasks.front();
+          taskQ->tasks.pop_front();
+          --taskQ->num_idle;
+          lock.unlock();
+          task(); // execute the task.
+          lock.lock();
+          ++taskQ->num_idle;
+        } else if (taskQ->exit) {
+          --taskQ->num_idle;
           break;
         } else {
-          auto r = taskQPtr->cv.wait_for(
-              locker, std::chrono::seconds(taskQPtr->linger));
-          if (r == std::cv_status::timeout &&
-              taskQPtr->tasks.size() > taskQPtr->minWorkers) {
-            taskQPtr->idleCnt--;
+          // wait for tasks.
+          auto r = taskQ->cv.wait_for(lock, std::chrono::seconds(taskQ->linger));
+          if (r == std::cv_status::timeout 
+            && this->m_threads.size() > taskQ->min_workers) {
+            --taskQ->num_idle;
+
+            auto it = std::find_if(m_threads.begin(), m_threads.end(), 
+              [&](const std::thread& t) {
+                return t.get_id() == std::this_thread::get_id();
+            });
+            if (it != m_threads.end()) {
+              it->detach();
+              m_threads.erase(it);
+            }
+            printf("%d: exit...\n", GetThreadID());
             break;
           }
         }
       }
+      
     });
   }
 
- private:
-  using task = std::function<void(void)>;
-  struct taskQ {
-    bool exit;
-    const int minWorkers;
-    const int maxWorkers;
-    const int linger;
-    int idleCnt;
+private:
+  using task = std::function<void()>;
+  struct TaskQ {
+    bool exit;  // thread pool exit or not.
+    const int min_workers;
+    const int max_workers;
+    const int linger; // seconds.
+    int num_idle; // num of idle threads.
     std::list<task> tasks;
-    SpinLock mtx;
-    std::condition_variable_any cv;
+    std::condition_variable cv;
+    std::mutex mtx;
 
-    taskQ(int min, int max, int lin)
-        : exit(false),
-          minWorkers(min),
-          maxWorkers(max),
-          linger(lin),
-          idleCnt(0) {}
+    TaskQ(int min, int max, int linger) 
+    : exit(false), min_workers(min), max_workers(max), 
+      linger(linger), num_idle(0) 
+    { }
   };
-  std::shared_ptr<taskQ> tskQptr;
-  std::list<std::thread> threads;
+
+  std::list<std::thread> m_threads;
+  std::shared_ptr<TaskQ> m_tasks;
+
 };
 
 // 不能被继承的类
@@ -397,7 +433,7 @@ protected:
     struct DLinkedNode {
         int _M_key;
         int _M_val;
-        int _M_use_count;
+        int _M_use_count = 0;
         DLinkedNode* _M_prev = 0;
         DLinkedNode* _M_next = 0;
     };
@@ -567,6 +603,6 @@ public:
 protected:
     std::unordered_map<int, DLinkedNode*> _M_cache;
     std::unordered_map<int, DLinkedList> _M_freq_cache;
-    int _M_cur_min_freq;
+    int _M_cur_min_freq = 1;
     int _M_capacity; // always > 0.
 };
